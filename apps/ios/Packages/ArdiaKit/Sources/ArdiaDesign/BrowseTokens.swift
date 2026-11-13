@@ -51,6 +51,9 @@ public enum BrowseLayout {
   public static let tabStackRadius: CGFloat = 5
   public static let tabStackTile = CGSize(width: 20, height: 26)
   public static let barCenterFromBottom: CGFloat = 44
+  public static let plusGlyphInsetInField: CGFloat = 26
+  public static let trayPillJoinShare: CGFloat = 0.35
+  public static let keyboardShareOfScreen: CGFloat = 0.345
   public static let barSideInset: CGFloat = 20
   public static let hitTarget: CGFloat = 44
   public static let barHeight: CGFloat = 75
@@ -62,6 +65,9 @@ public enum BrowseLayout {
 
 public extension Motion {
   static let searchRise = Animation.spring(response: 0.39, dampingFraction: 1)
+  static let trayGrow = Animation.interpolatingSpring(duration: 0.44, bounce: 0.14, initialVelocity: 7)
+  static let trayHeadStart: Duration = .milliseconds(160)
+  static let trayShrink = Animation.spring(response: 0.34, dampingFraction: 1)
   static let surfaceSwap = Animation.easeOut(duration: 0.3)
   static let surfaceFade = Animation.easeOut(duration: 0.2)
   static let trayDim = Animation.easeInOut(duration: 0.3)

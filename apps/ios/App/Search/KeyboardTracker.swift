@@ -6,6 +6,7 @@ import UIKit
 @Observable
 final class KeyboardTracker {
   private(set) var animation: Animation? = KeyboardTracker.animation(duration: 0.25, curve: KeyboardTracker.systemCurve)
+  private(set) var announcedHeight: CGFloat?
   @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
   static let systemCurve = 7
@@ -17,8 +18,12 @@ final class KeyboardTracker {
         let info = notification.userInfo ?? [:]
         let duration = (info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0.25
         let curve = (info[UIResponder.keyboardAnimationCurveUserInfoKey] as? Int) ?? Self.systemCurve
+        let endFrame = info[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+        let isHiding = notification.name == UIResponder.keyboardWillHideNotification
         MainActor.assumeIsolated {
           self?.animation = Self.animation(duration: duration, curve: curve)
+          guard let endFrame, let screenHeight = UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.screen.bounds.height }).first else { return }
+          self?.announcedHeight = isHiding ? 0 : max(screenHeight - endFrame.minY, 0)
         }
       }
       observers.append(observer)
