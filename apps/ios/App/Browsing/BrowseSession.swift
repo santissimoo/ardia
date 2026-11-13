@@ -19,6 +19,10 @@ final class BrowseSession {
 
   var search: SearchRequest?
   var trayHoldsKeyboard = false
+  var trayOwnsPlus = false
+  var trayCoversPageBar = false
+  var pagePlusFrame = CGRect.zero
+  var floatingPlusFrame = CGRect.zero
   var isToolbarPresented = false
   var readerTabID: UUID?
   var titleFeedback: String?

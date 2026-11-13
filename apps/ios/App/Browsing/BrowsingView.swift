@@ -8,9 +8,7 @@ struct BrowsingView: View {
 
   @Environment(AppModel.self) private var app
   @Environment(\.profileLook) private var look
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Namespace private var omnibox
   @State private var pager = PagerModel()
   @State private var barVisibility = BottomBarVisibility()
   @State private var tabSwitchTicks = 0
@@ -210,9 +208,9 @@ struct BrowsingView: View {
   }
 
   private var bar: some View {
-    BottomBar(
-      plusNamespace: omnibox,
-      isSearchPresented: app.browse.search != nil,
+    let coveredByTray = app.browse.trayCoversPageBar
+    return BottomBar(
+      hidesPlus: app.browse.trayOwnsPlus || (reduceMotion && app.browse.search != nil),
       onTabs: openDeck,
       onPlus: openSearch,
       onMore: { app.browse.isToolbarPresented = true },
@@ -224,7 +222,7 @@ struct BrowsingView: View {
     .padding(.top, BrowseLayout.barHeight - BrowseLayout.barCenterFromBottom - BrowseLayout.hitTarget / 2)
     .frame(maxWidth: .infinity)
     .frame(height: BrowseLayout.barHeight, alignment: .top)
-    .background { BarBacking(tone: tone?.bottom, solid: reduceTransparency) }
+    .background { BarBacking(tone: tone?.bottom, solid: true) }
     .environment(\.colorScheme, barScheme)
     .contentShape(.rect)
     .highPriorityGesture(pagerGesture)
@@ -232,6 +230,8 @@ struct BrowsingView: View {
     .opacity(barVisibility.isShown ? 1 : 0)
     .allowsHitTesting(barVisibility.isShown)
     .animation(reduceMotion ? .easeOut(duration: 0.2) : Motion.barCollapse, value: barVisibility.isShown)
+    .opacity(coveredByTray ? 0 : 1)
+    .animation(nil, value: coveredByTray)
     .ignoresSafeArea(.container, edges: .bottom)
     .ignoresSafeArea(.keyboard)
   }

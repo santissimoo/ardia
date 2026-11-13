@@ -3,8 +3,7 @@ import ArdiaDesign
 import SwiftUI
 
 struct BottomBar: View {
-  let plusNamespace: Namespace.ID
-  let isSearchPresented: Bool
+  let hidesPlus: Bool
   var onTabs: () -> Void
   var onPlus: () -> Void
   var onMore: () -> Void
@@ -18,9 +17,7 @@ struct BottomBar: View {
     let order = app.deckOrder
     HStack(spacing: 0) {
       Button(action: onTabs) {
-        TabStackGlyph(tabs: Array(order.suffix(2)))
-          .offset(x: -2.8)
-          .frame(width: 47, height: BrowseLayout.hitTarget)
+        PageBarTabsGlyph(tabs: Array(order.suffix(2)))
           .contentShape(.rect)
       }
       .buttonStyle(BarButtonStyle())
@@ -34,37 +31,22 @@ struct BottomBar: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
 
-      ZStack {
-        if isSearchPresented {
-          Color.clear
-        } else {
-          Button(action: onPlus) {
-            Image(systemName: "plus")
-              .font(.system(size: 16, weight: .semibold))
-              .foregroundStyle(BrowsePalette.foregroundPrimary)
-              .frame(width: BrowseLayout.plusCapsule.width, height: BrowseLayout.plusCapsule.height)
-              .contentShape(.capsule)
-          }
-          .buttonStyle(BarButtonStyle())
-          .background {
-            Capsule()
-              .fill(BarPalette.plusFill)
-              .overlay { Capsule().strokeBorder(BarPalette.controlEdge, lineWidth: 1 / 3) }
-              .matchedGeometryEffect(id: "omnibox", in: plusNamespace)
-          }
-          .transition(.opacity)
-          .accessibilityLabel("New Search")
-        }
+      Button(action: onPlus) {
+        BarPlusGlyph()
+          .frame(width: BrowseLayout.plusCapsule.width, height: BrowseLayout.plusCapsule.height)
+          .glassEffect(.regular.interactive(), in: .capsule)
+          .opacity(hidesPlus ? 0 : 1)
+          .animation(nil, value: hidesPlus)
+          .contentShape(.capsule)
       }
+      .buttonStyle(BarButtonStyle())
+      .accessibilityLabel("New Search")
+      .accessibilityHidden(hidesPlus)
       .frame(width: BrowseLayout.plusCapsule.width, height: BrowseLayout.plusCapsule.height)
+      .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { app.browse.pagePlusFrame = $0 }
 
       Button(action: onMore) {
-        Image(systemName: "chevron.up")
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundStyle(BrowsePalette.foregroundPrimary)
-          .frame(width: BrowseLayout.chevronCircle, height: BrowseLayout.chevronCircle)
-          .background(BarPalette.chevronFill, in: .circle)
-          .overlay { Circle().strokeBorder(BarPalette.controlEdge, lineWidth: 1 / 3) }
+        BarChevronGlyph()
           .frame(width: BrowseLayout.hitTarget, height: BrowseLayout.hitTarget)
           .contentShape(.rect)
       }
@@ -83,6 +65,53 @@ struct BottomBar: View {
     }
     if !recent.isEmpty { Divider() }
     Button("Close Tab", systemImage: "xmark", role: .destructive, action: onCloseTab)
+  }
+}
+
+struct BarPlusGlyph: View {
+  var body: some View {
+    Image(systemName: "plus")
+      .font(.system(size: 18, weight: .medium))
+      .foregroundStyle(.primary)
+  }
+}
+
+struct BarChevronGlyph: View {
+  var body: some View {
+    Image(systemName: "chevron.up")
+      .font(.system(size: 15, weight: .semibold))
+      .foregroundStyle(.primary)
+      .frame(width: BrowseLayout.chevronCircle, height: BrowseLayout.chevronCircle)
+      .glassEffect(.regular.interactive(), in: .circle)
+  }
+}
+
+struct PageBarSides: View {
+  let tabs: [BrowserTab]
+
+  var body: some View {
+    HStack(spacing: 0) {
+      PageBarTabsGlyph(tabs: tabs)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      Color.clear
+        .frame(width: BrowseLayout.plusCapsule.width, height: BrowseLayout.plusCapsule.height)
+      BarChevronGlyph()
+        .frame(width: BrowseLayout.hitTarget, height: BrowseLayout.hitTarget)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+    .padding(.horizontal, BrowseLayout.barSideInset - 4)
+    .frame(height: BrowseLayout.hitTarget)
+    .padding(.top, BrowseLayout.barHeight - BrowseLayout.barCenterFromBottom - BrowseLayout.hitTarget / 2)
+  }
+}
+
+struct PageBarTabsGlyph: View {
+  let tabs: [BrowserTab]
+
+  var body: some View {
+    TabStackGlyph(tabs: tabs)
+      .offset(x: -2.8)
+      .frame(width: 47, height: BrowseLayout.hitTarget)
   }
 }
 

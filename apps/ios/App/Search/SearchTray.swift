@@ -6,6 +6,8 @@ struct SearchTray<Drag: Gesture>: View {
   let request: BrowseSession.SearchRequest
   @Binding var isFocused: Bool
   let maxHeight: CGFloat
+  var morph: CGFloat = 1
+  var dock: TrayDock?
   let dismissDrag: Drag
 
   @Environment(AppModel.self) private var app
@@ -29,6 +31,12 @@ struct SearchTray<Drag: Gesture>: View {
   @ScaledMetric(relativeTo: .title3) private var placeholderSize: CGFloat = 20
 
   private var isIncognito: Bool { app.isIncognito }
+  private var restsOnPageBar: Bool { dock?.rest == .pageBar }
+
+  private var barTone: ToneColor? {
+    guard restsOnPageBar, let tab = app.tabs.selectedTab else { return nil }
+    return app.browse.tone(for: tab, page: app.currentPage).bottom
+  }
   private var rowsBudget: CGFloat { max(maxHeight - headerHeight, 0) }
 
   var body: some View {
@@ -38,6 +46,7 @@ struct SearchTray<Drag: Gesture>: View {
         .frame(maxWidth: .infinity)
         .frame(height: rowsBudget, alignment: .top)
         .clipped()
+        .modifier(StagedOpacity(progress: morph, start: 0.3, end: 0.8))
     }
     .frame(maxWidth: .infinity)
     .background(alignment: .top) {
@@ -66,22 +75,35 @@ struct SearchTray<Drag: Gesture>: View {
       .padding(.top, BrowseLayout.trayFieldTop)
       .padding(.bottom, Spacing.tight)
       .frame(maxWidth: .infinity)
+      .overlay(alignment: .top) {
+        if restsOnPageBar {
+          PageBarSides(tabs: Array(app.deckOrder.suffix(2)))
+            .environment(\.colorScheme, barTone?.scheme ?? colorScheme)
+            .modifier(StagedOpacity(progress: 1 - morph, start: 1 - BrowseLayout.trayPillJoinShare, end: 1))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+      }
       .contentShape(.rect)
       .highPriorityGesture(dismissDrag)
       .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
   }
 
   private var panelBackground: some View {
-    let shape = UnevenRoundedRectangle(topLeadingRadius: BrowseLayout.sheetTopRadius, topTrailingRadius: BrowseLayout.sheetTopRadius, style: .continuous)
-    return shape
-      .fill(isIncognito || reduceTransparency ? AnyShapeStyle(.clear) : AnyShapeStyle(.regularMaterial))
-      .overlay { shape.fill(panelTint) }
-      .shadow(color: .black.opacity(0.14), radius: 24, y: -4)
+    let radius = BrowseLayout.sheetTopRadius * morph
+    let shape = UnevenRoundedRectangle(topLeadingRadius: radius, topTrailingRadius: radius, style: .continuous)
+    return ZStack {
+      if restsOnPageBar {
+        BarBacking(tone: barTone, solid: true)
+      }
+      panelFill.opacity(restsOnPageBar ? morph : 1)
+    }
+    .clipShape(shape)
+    .shadow(color: .black.opacity(0.14 * morph), radius: 24, y: -4)
   }
 
-  private var panelTint: Color {
-    if isIncognito { return BrowsePalette.incognitoSheet }
-    return reduceTransparency ? look.surface : look.surface.opacity(BrowseLayout.sheetTintShare)
+  private var panelFill: Color {
+    isIncognito ? BrowsePalette.incognitoSheet : look.surface
   }
 
   private var field: some View {
@@ -116,13 +138,12 @@ struct SearchTray<Drag: Gesture>: View {
     .padding(.leading, 18)
     .padding(.trailing, 10)
     .frame(minHeight: fieldHeight)
+    .modifier(StagedOpacity(progress: morph, start: 0.45, end: 0.95))
     .background {
-      Capsule(style: .continuous)
-        .fill(isIncognito ? BrowsePalette.incognitoField : BrowsePalette.fieldFill)
-        .overlay {
-          Capsule(style: .continuous)
-            .strokeBorder(isIncognito ? Color.white.opacity(0.1) : BrowsePalette.fieldStroke, lineWidth: 1)
-        }
+      OmniboxCapsule(
+        morph: morph,
+        pillAtRest: dock?.pill.offsetBy(dx: -BrowseLayout.searchFieldInset, dy: -BrowseLayout.trayFieldTop)
+      )
     }
   }
 
@@ -316,7 +337,7 @@ struct SearchTray<Drag: Gesture>: View {
     if model == nil { rebuildModel() }
     text = request.initialText
     model?.update(request.initialText)
-    if mayFocus { isFocused = true }
+    if mayFocus, dock == nil { isFocused = true }
   }
 
   private var mayFocus: Bool {
@@ -350,5 +371,59 @@ struct SearchTray<Drag: Gesture>: View {
   private func leave() {
     isFocused = false
     app.browse.dismissSearch()
+  }
+}
+
+struct OmniboxCapsule: View, Animatable {
+  var morph: CGFloat
+  let pillAtRest: CGRect?
+
+  var animatableData: CGFloat {
+    get { morph }
+    set { morph = newValue }
+  }
+
+  var body: some View {
+    GeometryReader { proxy in
+      let field = CGRect(origin: .zero, size: proxy.size)
+      let pill = pillAtRest ?? field
+      let floatsAboveTray = pill.maxY < 0
+      let rise = floatsAboveTray ? min(morph / BrowseLayout.trayPillJoinShare, 1) : morph
+      let width = pill.width + (field.width - pill.width) * morph
+      let height = pill.height + (field.height - pill.height) * morph
+      let midX = pill.midX + (field.midX - pill.midX) * morph
+      let midY = pill.midY + (field.midY - pill.midY) * rise
+      Color.clear
+        .frame(width: width, height: height)
+        .glassEffect(.regular, in: .capsule)
+        .overlay(alignment: .leading) {
+          BarPlusGlyph()
+            .frame(width: pill.width)
+            .offset(x: (BrowseLayout.plusGlyphInsetInField - pill.width / 2) * morph)
+            .opacity(1 - StagedOpacity.share(of: morph, start: 0.25, end: 0.7))
+        }
+        .position(x: midX, y: midY)
+    }
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
+  }
+}
+
+struct StagedOpacity: ViewModifier, Animatable {
+  var progress: CGFloat
+  let start: CGFloat
+  let end: CGFloat
+
+  var animatableData: CGFloat {
+    get { progress }
+    set { progress = newValue }
+  }
+
+  static func share(of progress: CGFloat, start: CGFloat, end: CGFloat) -> CGFloat {
+    min(max((progress - start) / (end - start), 0), 1)
+  }
+
+  func body(content: Content) -> some View {
+    content.opacity(Self.share(of: progress, start: start, end: end))
   }
 }
